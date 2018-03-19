@@ -1,10 +1,10 @@
-package br.uece.compiladores.jflex;
+package Scanner;
 
 import java.io.File;
 import java.nio.file.Paths;
 
 public class CompiladoresJFlex {
-	private static final String PATH_JFLEX = "/src/main/resources/JFlex/minijava.jflex";
+	private static final String PATH_JFLEX = "/src/main/java/Scanner/minijava.jflex";
 
 	public void generateLexer() {
 		String rootPath = Paths.get("").toAbsolutePath().toString();

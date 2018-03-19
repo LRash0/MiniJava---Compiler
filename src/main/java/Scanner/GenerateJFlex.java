@@ -1,8 +1,6 @@
-package uece.br.compiladores;
+package Scanner;
 
-import br.uece.compiladores.jflex.CompiladoresJFlex;
-
-public class Principal {
+public class GenerateJFlex {
 
 	public static void main(String[] args) {
 		CompiladoresJFlex jflex = new CompiladoresJFlex();

@@ -1,0 +1,72 @@
+/*
+ * CUP specification for the parser for a simple demo language
+ * Change this into the parser for your implementation of MiniJava.
+ */
+
+package Parser;
+
+import Throwables.*;
+import AST.*;
+import java.util.*;
+import java_cup.runtime.*;
+
+
+/* Terminals (tokens returned by the scanner) */
+
+/* reserved words: */
+terminal RETURN;
+
+/* operators: */
+terminal PLUS, BECOMES;
+
+/* delimiters: */
+terminal LPAREN, RPAREN, SEMICOLON;
+
+/* tokens with values: */
+terminal String IDENTIFIER;
+
+
+/* Nonterminals */
+
+nonterminal List<Statement> Program;
+nonterminal Statement Statement;
+nonterminal Assign AssignStatement;
+nonterminal Return ReturnStatement;
+nonterminal Exp Expression;
+nonterminal Identifier Identifier;
+
+
+/* Precedence declarations */
+
+precedence left PLUS;
+
+
+/* Productions */
+
+Program ::= Statement:s
+            {: List<Statement> p = new LinkedList<Statement>();
+               p.add(s);
+               RESULT = p; :}
+        | Program:p Statement:s
+            {: p.add(s); RESULT = p; :};
+
+Statement   ::= AssignStatement:s
+                {: RESULT = s; :}
+            | ReturnStatement:s
+                {: RESULT = s; :};
+
+AssignStatement ::= Identifier:id BECOMES Expression:expr SEMICOLON
+                    {: RESULT = new Assign(id, expr, idleft); :};
+
+Identifier  ::= IDENTIFIER:id
+                {: RESULT = new Identifier(id, idleft); :};
+
+ReturnStatement ::= RETURN:r Expression:expr SEMICOLON
+                    {: RESULT = new Return(expr, rleft); :};
+
+Expression    ::= IDENTIFIER:name
+            {: RESULT = new IdentifierExp(name, nameleft); :}
+        | Expression:arg1 PLUS Expression:arg2
+            {: RESULT = new Plus(arg1, arg2, arg1left); :}
+        | LPAREN Expression:expr RPAREN
+            {: RESULT = expr; :};
