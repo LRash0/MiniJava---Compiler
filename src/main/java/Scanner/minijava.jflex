@@ -25,6 +25,13 @@ import Throwables.*;
   // note that these Symbol constructors are abusing the Symbol
   // interface to use Symbol's left and right fields as line and column
   // fields instead
+  
+  private List<Log> log = new LinkedList<Log>();
+  
+  public List<Log> getLogs(){
+  	return log;
+  }
+  
   private Symbol symbol(int type) {
     return new Symbol(type, yyline+1, yycolumn+1);
   }
@@ -50,15 +57,16 @@ import Throwables.*;
 %}
 
 /* Helper definitions */
-letter = [a-zA-Z]
-digit = [0-9]
-eol = [\r\n]
-white = {eol}|[ \t]
-
+LETTER = [a-zA-Z]
+DIGIT = [0-9]
+eol = [\r\n|\r|\n]
+WHITE = {eol}|[ \t]
+INTEGER_LITERAL = 0 | [1-9][0-9]*
+IDENTIFIER = {LETTER}({LETTER}|{DIGIT}|_)*
 
 /* COMENTARIOS */
 COMMENT_SIMPLELINE = "//" [^\r\n] * {eol}?
-COMMENT_MULTLINE = "/*" [^*] ~"*/" | "*/" "*"+ "/"
+COMMENT_MULTLINE = "/*" [^*] ~"*/" | "*/*" "*"+ "/"
 COMMENT_JAVADOC = "/*" "*"+ [^/*] ~"*/"
 COMMENT = {COMMENT_MULTLINE} | {COMMENT_SIMPLELINE} | {COMMENT_JAVADOC}
 
@@ -69,66 +77,75 @@ COMMENT = {COMMENT_MULTLINE} | {COMMENT_SIMPLELINE} | {COMMENT_JAVADOC}
 
 /* reserved words */
 /* (put here so that reserved words take precedence over identifiers) */
-"return" 				{ 	return 	symbol(sym.RETURN); 	}
-"class"  				{ 	return 	symbol(sym.CLASS);  	}
-"public" 				{	return 	symbol(sym.PUBLIC);		}
-"static"				{	return	symbol(sym.STATIC);		}
-"void" 					{	return 	symbol(sym.VOID);		}
-"main"					{	return 	symbol(sym.MAIN);		}
-"extends"				{	return 	symbol(sym.EXTENDS);	}
-"this"					{	return 	symbol(sym.THIS);		}
-"new"					{	return 	symbol(sym.NEW);		}
-"length"				{	return 	symbol(sym.LENGTH);		}
-"System.out.println"	{	return 	symbol(sym.PRINTLN);	}
+"return" 				{ 	return 	symbol(sym.WORD_RETURN); 		}
+"class"  				{ 	return 	symbol(sym.WORD_CLASS);  		}
+"public" 				{	return 	symbol(sym.WORD_PUBLIC);		}
+"static"				{	return	symbol(sym.WORD_STATIC);		}
+"void" 					{	return 	symbol(sym.WORD_VOID);			}
+"main"					{	return 	symbol(sym.WORD_MAIN);			}
+"extends"				{	return 	symbol(sym.WORD_EXTENDS);		}
+"this"					{	return 	symbol(sym.WORD_THIS);			}
+"new"					{	return 	symbol(sym.WORD_NEW);			}
+"length"				{	return 	symbol(sym.WORD_LENGTH);		}
+"System.out.println"	{	return 	symbol(sym.WORD_PRINTLN);		}
+
 
 /* Tipo de dados*/
+
 "int"		{	return 	symbol(sym.TYPE_INT);		}
 "boolean" 	{	return 	symbol(sym.TYPE_BOOL);		}
-"string"	{	return 	symbol(sym.TYPE_STRING);	}
+"String"	{	return 	symbol(sym.TYPE_STRING);	}
 
 /* Condicionais */
+
 "if" 	{	return 	symbol(sym.COND_IF);	}
 "else"	{	return 	symbol(sym.COND_ELSE);	}
 "while"	{	return 	symbol(sym.COND_WHILE);	}
 
 /* Valores booleanos */
+
 "true"	{	return 	symbol(sym.BOOL_LITERAL, new Boolean(true));	}
 "false"	{	return 	symbol(sym.BOOL_LITERAL, new Boolean(false));	}
 
 /* Identificadores */
+
 {IDENTIFIER}		{	return symbol(sym.IDENTIFIER, yytext());					}
-{INTEGER_LITERAL}	{ 	return symbol(sys.INTEGER_LITERAL, new Integer(yytext())); 	}
+{INTEGER_LITERAL}	{ 	return symbol(sym.INTEGER_LITERAL, new Integer(yytext())); 	}
 
 /*Linhas em branco*/
+
 {WHITE}+ { /* Pular espaco em branco */ }
 
 /* Ignorar comentarios */
+
 {COMMENT} { /* Ignorar comentarios */}
 
 
 /* operators */
-"+" { return symbol(sym.PLUS); 		}
-"-" { return symbol(sym.MINUS);		}
-"=" { return symbol(sym.EQUAL); 	}
-"!" { return symbol(sym.NOT);		}
-"*" { return symbol(sym.MULT);		}
-"&&"{ return symbol(sym.AND);		}
-"<"	{ return symbol(sym.LT);		}
 
-/* Separadorez */
-"(" { return symbol(sym.LPAREN); 	}
-")" { return symbol(sym.RPAREN); 	}
-";" { return symbol(sym.SEMICOLON); }
-","	{ return symbol(sym.COMMA);		}
-"." { return symbol(sym.DOT);		}
-"{" { return symbol(sym.LBRACE);	}
-"}" { return symbol(sym.RBRACE);	}
-"[" { return symbol(sym.LBRACK);	}
-"]"	{ return symbol(sym.RBRACK);	}
+"+"  { return symbol(sym.OPC_PLUS); 		}
+"-"  { return symbol(sym.OPC_MINUS);		}
+"="  { return symbol(sym.OPC_EQUAL); 		}
+"!"  { return symbol(sym.OPC_NOT);			}
+"*"  { return symbol(sym.OPC_MULT);			}
+"&&" { return symbol(sym.OPC_AND);			}
+"<"	 { return symbol(sym.OPC_LT);			}
+
+/* Separadores */
+"(" { return symbol(sym.SEP_LPAREN); 	}
+")" { return symbol(sym.SEP_RPAREN); 	}
+";" { return symbol(sym.SEP_SEMICOLON); }
+","	{ return symbol(sym.SEP_COMMA);		}
+"." { return symbol(sym.SEP_DOT);		}
+"{" { return symbol(sym.SEP_LBRACE);	}
+"}" { return symbol(sym.SEP_RBRACE);	}
+"[" { return symbol(sym.SEP_LBRACK);	}
+"]"	{ return symbol(sym.SEP_RBRACK);	}
 
 
 /* lexical errors (put last so other matches take precedence) */
-. { throw new LexicalCompilerException(
+.|\n { throw new LexicalCompilerException(
 	"unexpected character in input: '" + yytext() + "'", 
 	yyline+1, yycolumn+1);
+	log.add(new LexicalLog(yytext(),yyline,yycolumn));
   }
