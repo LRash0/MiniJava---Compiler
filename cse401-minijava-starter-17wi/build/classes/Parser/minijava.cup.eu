@@ -1,0 +1,269 @@
+/*
+ * CUP specification for the parser for a simple demo language.
+ * Change this into the parser for your implementation of MiniJava.
+ * CSE 401/P501 Au11.
+ */
+
+package Parser;
+
+import AST.*;
+import java.util.*;
+import java_cup.runtime.*;
+import errorHandle.ParserErrorHandler;
+
+/* Code in the following section is included in the generated parser */
+
+parser code {:
+  /* Override default error message routine to handle line numbers correctly */
+  /* This routine is also called in the process of handling fatal errors. */
+
+  /** Report a non fatal error (or warning).  This method takes a message 
+   *  string and an additional object (to be used by specializations 
+   *  implemented in subclasses).  Prints the same simple error message
+   *  as the base class version, but correctly labels the line number.
+   *
+   * @param message an error message.
+   * @param info    an extra object reserved for use by specialized subclasses.
+   */
+  public void report_error(String message, Object info)
+    {
+      System.err.print(message);
+      System.err.flush();
+      if (info instanceof Symbol) {
+         Symbol info_sym = (Symbol) info;
+
+         if ( info_sym.left != -1 ) {
+             System.err.println(" at line " + info_sym.left +
+                                    " of input");
+          } else {
+            System.err.println("");
+         }
+      } else {
+         System.err.println("");
+      }
+
+      ParserErrorHandler.handleParserError();
+    }
+:};
+
+/* end of code included in generated parser
+
+
+/* Terminals (tokens returned by the scanner) */
+
+/* reserved words: */
+
+terminal WORD_RETURN;
+terminal WORD_CLASS;
+terminal WORD_PUBLIC;
+terminal WORD_STATIC;
+terminal WORD_VOID;
+terminal WORD_MAIN;
+terminal WORD_EXTENDS;
+terminal WORD_THIS;
+terminal WORD_NEW;
+terminal WORD_LENGTH;
+terminal WORD_PRINTLN;
+terminal COND_IF;
+terminal COND_ELSE;
+terminal COND_WHILE;
+terminal TRUE;
+terminal FALSE;
+
+
+
+/* operators: */
+
+terminal OPC_PLUS, OPC_MINUS,OPC_EQUAL,OPC_NOT,OPC_MULT,OPC_AND,OPC_LT;
+
+/* delimiters: */
+
+terminal SEP_LPAREN, SEP_RPAREN, SEP_SEMICOLON,SEP_COMMA,SEP_DOT,SEP_LBRACE,SEP_RBRACE,SEP_LBRACK,SEP_RBRACK;
+
+/* tokens with values: */
+
+terminal String IDENTIFIER;
+terminal Integer INTEGER_LITERAL;
+terminal Boolean BOOL_LITERAL;
+
+/* Nonterminals */
+
+nonterminal Program Program;
+nonterminal Statement Statement;
+nonterminal Assign AssignStatement;
+nonterminal Exp Expression;
+nonterminal Identifier Identifier;
+nonterminal Type Type;
+nonterminal MainClass MainClass;
+nonterminal ClassDecl ClassDecl;
+nonterminal VarDecl VarDecl;
+nonterminal VarDeclList VarDeclList;
+nonterminal MethodDecl MethodDecl;
+nonterminal MethodDeclList MethodDeclList;
+nonterminal FormalList FormalList;
+nonterminal Formal Formal;
+nonterminal StatementList StatementList;
+nonterminal ArrayAssign ArrayAssign;
+nonterminal ExpList ExpList;
+
+/* Precedence declarations */
+
+precedence left OPC_AND;
+precedence nonassoc OPC_NOT;
+precedence left OPC_LT;
+precedence left OPC_MINUS;
+precedence left OPC_PLUS;
+precedence left OPC_MULT;
+precedence left SEP_LBRACK;
+precedence left SEP_DOT;
+
+/* Productions */
+
+Program ::= MainClass:mc
+            {: ClassDeclList cdl = new ClassDeclList(mcleft);
+               RESULT = new Program(mc, cdl, mcleft); :}
+          | Program:p ClassDecl:cd
+            {: p.cl.add( cd );
+               RESULT = p; :};
+
+MainClass ::= WORD_CLASS Identifier:id1 SEP_LBRACE WORD_MAIN Identifier:id2 SEP_RPAREN SEP_LBRACE
+              Statement:s SEP_RBRACE SEP_RBRACE
+              {: RESULT = new MainClass(id1, id2, s, id1left); :};
+
+ClassDecl ::= WORD_CLASS Identifier:id SEP_LBRACE VarDeclList:vdl MethodDeclList:mdl
+              SEP_RBRACE
+              {: if (vdl == null) { vdl = new VarDeclList(idleft); }
+                 if (mdl == null) { mdl = new MethodDeclList(idleft); }
+                 RESULT = new ClassDeclSimple(id, vdl, mdl, idleft); :}
+            | WORD_CLASS Identifier:id1 WORD_EXTENDS Identifier:id2 SEP_LBRACE
+              VarDeclList:vdl MethodDeclList:mdl SEP_RBRACE
+              {: if (vdl == null) { vdl = new VarDeclList(id1left); }
+                 if (mdl == null) { mdl = new MethodDeclList(id1left); }
+                 RESULT = new ClassDeclExtends(id1, id2, vdl, mdl, id1left); :};
+
+VarDecl ::= Type:t Identifier:id SEP_SEMICOLON
+            {: RESULT = new VarDecl(t, id, tleft); :};
+
+VarDeclList ::= VarDeclList:vdl VarDecl:vd
+                {: if( vdl == null ) { vdl = new VarDeclList(vdlleft); }
+                   vdl.add(vd);
+                   RESULT = vdl; :}
+              | /* empty */
+                {: RESULT = null; :};
+
+MethodDeclList ::= MethodDeclList:mdl MethodDecl:m
+                   {: if (mdl == null) { mdl = new MethodDeclList(mdlleft); }
+                      mdl.add(m);
+                      RESULT = mdl; :}
+                 | /* empty */
+                   {: RESULT = null; :};
+
+MethodDecl ::= WORD_PUBLIC:p Type:t Identifier:id SEP_LPAREN SEP_RPAREN SEP_LBRACE VarDeclList:vdl
+               StatementList:sl WORD_RETURN Expression:e SEP_SEMICOLON SEP_RBRACE
+               {: if (vdl == null) { vdl = new VarDeclList(vdlleft); }
+                  if (sl == null) { sl = new StatementList(slleft); }
+                  RESULT = new MethodDecl(t, id, new FormalList(idleft), vdl,
+                                          sl, e, pleft); :}
+             | WORD_PUBLIC:p Type:t Identifier:id SEP_LPAREN FormalList:fl SEP_RPAREN
+               SEP_LBRACE VarDeclList:vdl StatementList:sl WORD_RETURN Expression:e
+               SEP_SEMICOLON SEP_RBRACE
+               {: if (vdl == null) { vdl = new VarDeclList(vdlleft); }
+                  if (sl == null) { sl = new StatementList(slleft); }
+                  RESULT = new MethodDecl(t, id, fl, vdl, sl, e, pleft); :};
+
+FormalList ::= Formal:f
+               {: FormalList fl = new FormalList(fleft);
+                  fl.add(f);
+                  RESULT = fl; :}
+             | FormalList:fl SEP_COMMA Formal:f
+               {: fl.add(f);
+                  RESULT = fl; :};
+
+
+
+Formal ::= Type:t Identifier:id
+           {: RESULT = new Formal(t, id, tleft); :};
+
+StatementList ::= /* empty */
+                  {: RESULT = null; :}
+                | Statement:s StatementList:sl
+                  {: if (sl == null) { sl = new StatementList(sleft); }
+                     sl.addToFront(s);
+                     RESULT = sl; :};
+
+
+ExpList ::= Expression:e
+            {: ExpList el = new ExpList(eleft);
+               el.add(e);
+               RESULT = el; :}
+          | ExpList:el SEP_COMMA Expression:e
+            {: el.add(e);
+               RESULT = el; :};
+
+Type ::= INTEGER_LITERAL
+         {: RESULT = new IntegerType( ileft ); :}
+       | BOOL_LITERAL:b
+         {: RESULT = new BooleanType( bleft ); :}
+       | INTEGER_LITERAL SEP_LBRACE SEP_RBRACE
+         {: RESULT = new IntArrayType( ileft ); :}
+       | Identifier:id
+         {: RESULT = new IdentifierType( id.toString(), idleft ); :};
+
+Statement ::= SEP_LBRACE:lfb StatementList:sl SEP_RBRACE
+              {: if (sl == null) { sl = new StatementList(lfbleft); }
+                 RESULT = new Block(sl, lfbleft); :}
+            | COND_IF SEP_LPAREN Expression:e SEP_RPAREN Statement:s1 COND_ELSE Statement:s2
+              {: RESULT = new If(e, s1, s2, eleft); :}
+            | COND_WHILE SEP_LPAREN Expression:e SEP_RPAREN Statement:s
+              {: RESULT = new While(e, s, eleft); :}
+            | WORD_PRINTLN SEP_LPAREN Expression:e SEP_RPAREN SEP_SEMICOLON
+              {: RESULT = new Print(e, eleft); :}
+            | AssignStatement:s
+              {: RESULT = s; :}
+            | ArrayAssign:ass
+              {: RESULT = ass; :};
+
+AssignStatement ::= Identifier:id OPC_EQUAL Expression:expr SEP_SEMICOLON
+                    {: RESULT = new Assign(id, expr, idleft); :};
+
+ArrayAssign ::= Identifier:id SEP_LBRACE Expression:e1 SEP_RBRACE OPC_EQUAL Expression:e2
+                SEP_SEMICOLON
+                {: RESULT = new ArrayAssign(id, e1, e2, idleft); :};
+
+
+Identifier ::= IDENTIFIER:id
+               {: RESULT = new Identifier(id, idleft); :};
+
+Expression ::= Expression:e1 SEP_LBRACE Expression:e2 SEP_RBRACE
+               {: RESULT = new ArrayLookup(e1, e2, e1left); :}
+             | Expression:arg1 OPC_PLUS Expression:arg2
+               {: RESULT = new Plus(arg1, arg2, arg1left); :}
+             | Expression:arg1 OPC_MINUS Expression:arg2
+               {: RESULT = new Minus(arg1, arg2, arg1left); :}
+             | Expression:arg1 OPC_MULT Expression:arg2
+               {: RESULT = new Times(arg1, arg2, arg1left); :}
+             | Expression:arg1 OPC_AND Expression:arg2
+               {: RESULT = new And(arg1, arg2, arg1left); :}
+             | Expression:arg1 OPC_LT Expression:arg2
+               {: RESULT = new LessThan(arg1, arg2, arg1left); :}
+             | Expression:e SEP_DOT WORD_LENGTH
+               {: RESULT = new ArrayLength(e, eleft); :}
+             | SEP_LPAREN Expression:expr SEP_RPAREN
+               {: RESULT = expr; :}
+             | INTEGER_LITERAL:i
+               {: int n = Integer.parseInt(i);
+               RESULT = new IntegerLiteral(n, ileft); :}
+             | TRUE:t
+               {: RESULT = new True(tleft); :}
+             | FALSE:f
+               {: RESULT = new False(fleft); :}
+             | IDENTIFIER:name
+               {: RESULT = new IdentifierExp(name, nameleft); :}
+             | WORD_THIS:t
+               {: RESULT = new This(tleft); :}
+             | OPC_NOT Expression:e
+               {: RESULT = new Not(e, eleft); :}
+             | Expression:e SEP_DOT Identifier:id SEP_LPAREN SEP_RPAREN
+               {: RESULT = new Call(e, id, new ExpList(eleft), eleft); :}
+             | Expression:e SEP_DOT Identifier:id SEP_LPAREN ExpList:el SEP_RPAREN
+               {: RESULT = new Call(e, id, el, eleft); :};

@@ -1,0 +1,176 @@
+/*
+ * JFlex specification for the lexical analyzer for a simple demo language
+ * Change this into the scanner for your implementation of MiniJava.
+ */
+
+
+package Scanner;
+
+import java_cup.runtime.*;
+import Parser.sym;
+import Throwables.*;
+
+%%
+
+%public
+%final
+%class scanner
+%unicode
+%cup
+%line
+%column
+
+%{
+  // note that these Symbol constructors are abusing the Symbol
+  // interface to use Symbol's left and right fields as line and column
+  // fields instead
+  
+  
+  
+  private Symbol symbol(int type) {
+    return new Symbol(type, yyline+1, yycolumn+1);
+  }
+  private Symbol symbol(int type, Object value) {
+    return new Symbol(type, yyline+1, yycolumn+1, value);
+  }
+
+  // print out a symbol (aka token) nicely
+  public String symbolToString(Symbol s) {
+    switch (s.sym) {
+      case sym.OPC_EQUAL: return "OPC_EQUAL";
+      case sym.SEP_SEMICOLON: return "SEP_SEMICOLON";
+      case sym.SEP_COMMA: return "SEP_COMMA";
+      case sym.OPC_PLUS: return "OPC_PLUS";
+      case sym.OPC_MINUS: return "OPC_MINUS";
+      case sym.SEP_LPAREN: return "SEP_LPAREN";
+      case sym.SEP_RPAREN: return "SEP_RPAREN";
+      case sym.SEP_LBRACK: return "SEP_LBRACK";
+      case sym.SEP_RBRACK: return "SEP_RBRACK";
+      case sym.SEP_LBRACE: return "SEP_LBRACE";
+      case sym.SEP_RBRACE: return "SEP_RBRACE";
+      case sym.OPC_MULT: return "OPC_MULT";
+      case sym.COND_IF: return "COND_IF";
+      case sym.COND_ELSE: return "COND_ELSE";
+      case sym.WORD_THIS: return "WORD_THIS";
+      case sym.COND_WHILE: return "WHCOND_WHILEILE";
+      case sym.OPC_NOT: return "OPC_NOT";
+      case sym.SEP_DOT: return "SEP_DOT";
+      case sym.WORD_LENGTH: return "WORD_LENGTH";
+      case sym.WORD_NEW: return "WORD_NEW";
+      case sym.TYPE_INT: return "TYPE_INT"; 
+      case sym.TYPE_BOOL: return "<BOOL>";
+      case sym.WORD_PUBLIC: return "WORD_PUBLIC";
+      case sym.WORD_CLASS: return "WORD_CLASS";
+      case sym.WORD_STATIC: return "WORD_STATIC";
+      case sym.WORD_VOID: return "WORD_VOID";
+      case sym.WORD_MAIN: return "WORD_MAIN";
+      case sym.TYPE_STRING: return "TYPE_STRING";
+      case sym.WORD_EXTENDS: return "WORD_EXTENDS";
+      case sym.WORD_RETURN: return "WORD_RETURN";
+      case sym.OPC_LT: return "OPC_LT";
+      case sym.OPC_AND: return "OPC_AND";
+      case sym.BOOL_LITERAL: return "<BOOL("+s.value.toString()+")>";
+      case sym.WORD_PRINTLN: return "<PRINTLN>";
+      case sym.INTEGER_LITERAL: return "<INT("+s.value.toString()+")>";
+      case sym.IDENTIFIER: return "<ID("+(String)s.value+")>";
+      case sym.EOF: return "<EOF>";
+      case sym.error: return "<ERROR>";
+      default: return "<UNEXPECTED TOKEN " + s.toString() + ">";
+    }
+  }
+%}
+
+/* Helper definitions */
+LETTER = [a-zA-Z]
+DIGIT = [0-9]
+eol = [\r\n|\r|\n]
+WHITE = {eol}|[ \t]
+INTEGER_LITERAL = 0 | [1-9][0-9]*
+IDENTIFIER = {LETTER}({LETTER}|{DIGIT}|_)*
+
+/* COMENTARIOS */
+COMMENT_SIMPLELINE = "//" [^\r\n] * {eol}?
+COMMENT_MULTLINE = "/*" [^*] ~"*/" | "*/*" "*"+ "/"
+COMMENT_JAVADOC = "/*" "*"+ [^/*] ~"*/"
+COMMENT = {COMMENT_MULTLINE} | {COMMENT_SIMPLELINE} | {COMMENT_JAVADOC}
+
+
+%%
+
+/* Token definitions */
+
+/* reserved words */
+/* (put here so that reserved words take precedence over identifiers) */
+"return" 				{ 	return 	symbol(sym.WORD_RETURN); 		}
+"class"  				{ 	return 	symbol(sym.WORD_CLASS);  		}
+"public" 				{	return 	symbol(sym.WORD_PUBLIC);		}
+"static"				{	return	symbol(sym.WORD_STATIC);		}
+"void" 					{	return 	symbol(sym.WORD_VOID);			}
+"main"					{	return 	symbol(sym.WORD_MAIN);			}
+"extends"				{	return 	symbol(sym.WORD_EXTENDS);		}
+"this"					{	return 	symbol(sym.WORD_THIS);			}
+"new"					{	return 	symbol(sym.WORD_NEW);			}
+"length"				{	return 	symbol(sym.WORD_LENGTH);		}
+"System.out.println"	{	return 	symbol(sym.WORD_PRINTLN);		}
+
+
+/* Tipo de dados*/
+
+"int"		{	return 	symbol(sym.TYPE_INT);		}
+"boolean" 	{	return 	symbol(sym.TYPE_BOOL);		}
+"String"	{	return 	symbol(sym.TYPE_STRING);	}
+
+/* Condicionais */
+
+"if" 	{	return 	symbol(sym.COND_IF);	}
+"else"	{	return 	symbol(sym.COND_ELSE);	}
+"while"	{	return 	symbol(sym.COND_WHILE);	}
+
+/* Valores booleanos */
+
+"TRUE"	{	return 	symbol(sym.BOOL_LITERAL, new Boolean(true));	}
+"FALSE"	{	return 	symbol(sym.BOOL_LITERAL, new Boolean(false));	}
+
+/* Identificadores */
+
+{IDENTIFIER}		{	return symbol(sym.IDENTIFIER, yytext());					}
+{INTEGER_LITERAL}	{ 	return symbol(sym.INTEGER_LITERAL, yytext()); 	}
+
+/*Linhas em branco*/
+
+{WHITE}+ { /* Pular espaco em branco */ }
+
+/* Ignorar comentarios */
+
+{COMMENT} { /* Ignorar comentarios */}
+
+
+/* operators */
+
+"+"  { return symbol(sym.OPC_PLUS); 		}
+"-"  { return symbol(sym.OPC_MINUS);		}
+"="  { return symbol(sym.OPC_EQUAL); 		}
+"!"  { return symbol(sym.OPC_NOT);			}
+"*"  { return symbol(sym.OPC_MULT);			}
+"&&" { return symbol(sym.OPC_AND);			}
+"<"	 { return symbol(sym.OPC_LT);			}
+
+/* Separadores */
+"(" { return symbol(sym.SEP_LPAREN); 	}
+")" { return symbol(sym.SEP_RPAREN); 	}
+";" { return symbol(sym.SEP_SEMICOLON); }
+","	{ return symbol(sym.SEP_COMMA);		}
+"." { return symbol(sym.SEP_DOT);		}
+"{" { return symbol(sym.SEP_LBRACE);	}
+"}" { return symbol(sym.SEP_RBRACE);	}
+"[" { return symbol(sym.SEP_LBRACK);	}
+"]"	{ return symbol(sym.SEP_RBRACK);	}
+
+
+/* lexical errors (put last so other matches take precedence) */
+. { 
+    System.err.println(
+        "\nunexpected character in input: '" + yytext() + "' at line " +
+        (yyline+1) + " column " + (yycolumn+1));
+    return symbol(sym.error);
+}

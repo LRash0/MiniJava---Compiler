@@ -1,0 +1,256 @@
+package miniJava.parser;
+
+import java_cup.runtime.*;
+
+// Imports adicionados
+import java.io.IOException;
+import java.nio.file.Path;
+import miniJava.lexer.Lexer;
+
+import miniJava.ast.declaration.classDecl.ClassDecl;
+import miniJava.ast.declaration.classDecl.ExtendedClassDecl;
+import miniJava.ast.declaration.classDecl.SimpleClassDecl;
+import miniJava.ast.declaration.classDecl.list.ClassDeclList;
+import miniJava.ast.declaration.classDecl.main.MainClassDecl;
+import miniJava.ast.declaration.methodDecl.Argument;
+import miniJava.ast.declaration.methodDecl.MethodDecl;
+import miniJava.ast.declaration.methodDecl.list.ArgumentList;
+import miniJava.ast.declaration.methodDecl.list.MethodDeclList;
+import miniJava.ast.declaration.varDecl.VarDecl;
+import miniJava.ast.declaration.varDecl.list.VarDeclList;
+import miniJava.ast.expression.Expression;
+import miniJava.ast.expression.MethodCallExpr;
+import miniJava.ast.expression.ThisExpr;
+import miniJava.ast.expression.array.ArrayLengthExpr;
+import miniJava.ast.expression.array.ArrayLookupExpr;
+import miniJava.ast.expression.array.NewArrayExpr;
+import miniJava.ast.expression.bool.BinaryBooleanExpr;
+import miniJava.ast.expression.bool.BooleanLiteralExpr;
+import miniJava.ast.expression.bool.UnaryBooleanExpr;
+import miniJava.ast.expression.identifier.IdentifierExpr;
+import miniJava.ast.expression.identifier.NewObjectExpr;
+import miniJava.ast.expression.integer.BinaryIntegerExpr;
+import miniJava.ast.expression.integer.IntegerLiteralExpr;
+import miniJava.ast.expression.list.ExpressionList;
+import miniJava.ast.identifier.Identifier;
+import miniJava.ast.program.Program;
+import miniJava.ast.statement.*;
+import miniJava.ast.statement.list.StatementList;
+import miniJava.ast.type.*;
+
+parser code {:
+
+    // Salvando lexer e o arquivo como objetos da classe
+    private Lexer lexer;
+
+    // Salvando arquivo, talvez para algum futuro uso
+    private Path file;
+
+    // Criando novo construtor onde é possivel setar um arquivo para ser analizado
+    public Parser(Path file) throws IOException {
+
+        // Salvando refrencia do arquivo
+        this.file = file;
+
+        // Criando um gerador de simbolos que sera salva na superclasse do lexer e no parser
+        // (não sei o porque de salvar no lexer)
+        ComplexSymbolFactory symbolFactory = new ComplexSymbolFactory();
+
+        // Superclasse lr_parser contem este atributo
+        super.symbolFactory = symbolFactory;
+
+        // Inicializando o lexer com o arquivo recebido e o gerador de simbolos
+        // Construtor abaixo descrito na especificação do lexer
+        // Tambem pode lançar execessão, que deve ser capturada ou lançar novamente por esse construtor
+        this.lexer = new Lexer(file, symbolFactory);
+    }
+:}
+
+init with {:
+:};
+
+scan with {:
+    // Função de scanner que é criada automaticamente pela integração do jflex com o cup na especificação do lexer
+    return lexer.next_token();
+:};
+
+
+// Definição de terminais
+terminal CLASS, PUBLIC, EXTENDS, STATIC, VOID, INT, BOOLEAN, WHILE, IF, ELSE, RETURN, THIS, NEW,
+         SEMICOLON, DOT, COMMA, ASSIGN, O_PAR, C_PAR, O_BRAC, C_BRAC, O_BRACK, C_BRACK,
+         OR, AND, EQUALS, DIFF, LESS, LESS_EQ, GREATER, GREATER_EQ, PLUS, MINUS, TIMES, SLASH, PERCENT, OPP;
+terminal Boolean FALSE, TRUE;
+terminal Integer INTEGER;
+terminal Double FLOAT;
+terminal String ID;
+
+// Terminais do main, println e length
+terminal MAIN, PRINTLN, LENGTH;
+
+// Novo terminal do argumento String do main
+terminal STRGARG;
+
+// Definição dos não terminais (deve haver uma classe da arvore sintática abstrata para cada não terminal)
+
+// Programa
+non terminal Program prog;
+
+// Declarações
+non terminal MainClassDecl mClass;
+non terminal ClassDeclList classList;
+non terminal ClassDecl clas; // Interface, pois pode ser Simple ou Extended Class Declaration
+non terminal Identifier ext;
+non terminal VarDeclList varList;
+non terminal VarDecl var;
+non terminal MethodDeclList methodList;
+non terminal MethodDecl method;
+non terminal ArgumentList argumentList;
+non terminal ArgumentList arguments;
+non terminal Argument argument;
+
+// Tipos de dados e identificador
+non terminal Type type;
+non terminal Identifier id;
+
+// Afirmações e expressões
+non terminal StatementList stmtList;
+non terminal Statement stmt;
+non terminal Expression expr;
+
+// Parametros de chamadas a metodos
+non terminal ExpressionList paramList;
+non terminal ExpressionList params;
+
+// Regras de precedencia
+
+// Atribuição associa a direita
+precedence right ASSIGN;
+
+// And e or associam a esquerda sempre, como operações quaisquer
+precedence left AND, OR;
+
+// Já o operador de negação associa a direita
+precedence right OPP;
+
+// Operações de comparação associam a esquerda
+precedence nonassoc EQUALS, DIFF, LESS, LESS_EQ, GREATER, GREATER_EQ;
+
+// Associa acima e a esquerda operações de soma e subtração
+precedence left PLUS, MINUS;
+// Associa a esquerda apos operações de soma e subtração, pus mod no mesmo nivel de divisão
+precedence left TIMES, SLASH, PERCENT;
+
+// New associa com o tipo a sua direita
+precedence right NEW;
+
+// IDs não associam
+precedence nonassoc ID;
+
+// Ponto é referencia, então associa a esquerda sempre
+precedence left DOT;
+
+// Gramática
+
+prog        ::= mClass:main classList:cList                             {:RESULT = new Program(main, cList);:}
+            ;
+
+mClass      ::= CLASS id:name O_BRAC PUBLIC STATIC VOID MAIN O_PAR STRGARG id:args C_PAR O_BRAC stmtList:main C_BRAC C_BRAC
+                                                                        {:RESULT = new MainClassDecl(name, args, main);:}
+            ;
+
+classList   ::= classList:cList clas:cl                                 {:cList.add(cl); RESULT = cList;:}
+                |                                                       {:RESULT = new ClassDeclList();:}
+            ;
+
+clas        ::= CLASS id:name ext:extclass O_BRAC varList:vars methodList:methods C_BRAC
+                                                                        {:if (extclass == null) RESULT = new SimpleClassDecl(name, vars, methods);
+                                                                        else RESULT = new ExtendedClassDecl(name, vars, methods, extclass);:}
+            ;
+
+ext         ::= EXTENDS id:cl                                           {:RESULT = cl;:}
+                |                                                       {:RESULT = null;:}
+            ;
+
+varList     ::= varList:vList var:var                                   {:vList.add(var); RESULT = vList;:}
+                |                                                       {:RESULT = new VarDeclList();;:}
+            ;
+
+var         ::= type:type id:name SEMICOLON                             {:RESULT = new VarDecl(type, name);:}
+            ;
+
+methodList  ::= methodList:mList method:method                          {:mList.add(method); RESULT = mList;:}
+                |                                                       {:RESULT = new MethodDeclList();:}
+            ;
+
+method      ::= PUBLIC type:rType id:name O_PAR argumentList:args C_PAR O_BRAC varList:vars stmtList:code RETURN expr:ret SEMICOLON C_BRAC
+                                                                        {:RESULT = new MethodDecl(rType, name, args, vars, code, ret);:}
+            ;
+
+argumentList::= arguments:aList                                         {:RESULT = aList;:}
+                |                                                       {:RESULT = new ArgumentList();:}
+            ;
+
+arguments   ::= arguments:aList COMMA argument:arg                      {:aList.add(arg); RESULT = aList;:}
+                | argument:arg                                          {:RESULT = new ArgumentList(); RESULT.add(arg);:}
+            ;
+
+argument    ::= type:type id:name                                       {:RESULT = new Argument(type, name);:}
+            ;
+
+type        ::= INT                                                     {:RESULT = new IntegerType();:}
+                | INT O_BRACK C_BRACK                                   {:RESULT = new IntArrayType();:}
+                | BOOLEAN                                               {:RESULT = new BooleanType();:}
+                | id:id                                                 {:RESULT = new IdentifierType(id);:}
+            ;
+
+id          ::= ID:stringid                                             {:RESULT = new Identifier(stringid);:}
+            ;
+
+stmtList    ::= stmt:stmt stmtList:sList                                {:sList.add(stmt); RESULT = sList;:}
+                |                                                       {:RESULT = new StatementList();:}
+            ;
+
+stmt        ::= O_BRAC stmtList:sList C_BRAC                            {:RESULT = new BlockStmt(sList);:}
+                | IF O_PAR expr:expr C_PAR stmt:i ELSE stmt:e           {:RESULT = new IfStmt(expr, i, e);:}
+                | WHILE O_PAR expr:expr C_PAR stmt:s                    {:RESULT = new WhileStmt(expr, s);:}
+                | PRINTLN O_PAR expr:expr C_PAR SEMICOLON               {:RESULT = new PrintStmt(expr);:}
+                | id:var ASSIGN expr:expr SEMICOLON                     {:RESULT = new AssignStmt(var, expr);:}
+                | id:array O_BRACK expr:index C_BRACK ASSIGN expr:expr SEMICOLON   {:RESULT = new ArrayAssignStmt(array, index, expr);:}
+            ;
+
+expr        ::= expr:l OR expr:r                                        {:RESULT = new BinaryBooleanExpr(l, r, BinaryBooleanExpr.BinaryBooleanOperation.OR);:}
+                | expr:l AND expr:r                                     {:RESULT = new BinaryBooleanExpr(l, r, BinaryBooleanExpr.BinaryBooleanOperation.AND);:}
+                | expr:l EQUALS expr:r                                  {:RESULT = new BinaryBooleanExpr(l, r, BinaryBooleanExpr.BinaryBooleanOperation.EQUALS);:}
+                | expr:l DIFF expr:r                                    {:RESULT = new BinaryBooleanExpr(l, r, BinaryBooleanExpr.BinaryBooleanOperation.DIFF);:}
+                | expr:l LESS expr:r                                    {:RESULT = new BinaryBooleanExpr(l, r, BinaryBooleanExpr.BinaryBooleanOperation.LESS);:}
+                | expr:l LESS_EQ expr:r                                 {:RESULT = new BinaryBooleanExpr(l, r, BinaryBooleanExpr.BinaryBooleanOperation.LESS_THAN);:}
+                | expr:l GREATER expr:r                                 {:RESULT = new BinaryBooleanExpr(l, r, BinaryBooleanExpr.BinaryBooleanOperation.GREATER);:}
+                | expr:l GREATER_EQ expr:r                              {:RESULT = new BinaryBooleanExpr(l, r, BinaryBooleanExpr.BinaryBooleanOperation.GREATER_THAN);:}
+                | expr:l PLUS expr:r                                    {:RESULT = new BinaryIntegerExpr(l, r, BinaryIntegerExpr.BinaryIntegerOperation.PLUS);:}
+                | expr:l MINUS expr:r                                   {:RESULT = new BinaryIntegerExpr(l, r, BinaryIntegerExpr.BinaryIntegerOperation.MINUS);:}
+                | expr:l TIMES expr:r                                   {:RESULT = new BinaryIntegerExpr(l, r, BinaryIntegerExpr.BinaryIntegerOperation.MUL);:}
+                | expr:l SLASH expr:r                                   {:RESULT = new BinaryIntegerExpr(l, r, BinaryIntegerExpr.BinaryIntegerOperation.DIV);:}
+                | expr:l PERCENT expr:r                                 {:RESULT = new BinaryIntegerExpr(l, r, BinaryIntegerExpr.BinaryIntegerOperation.MOD);:}
+                | OPP expr:e                                            {:RESULT = new UnaryBooleanExpr(e, UnaryBooleanExpr.UnaryBooleanOperation.OPPOSITE);:}
+                | expr:array O_BRACK expr:index C_BRACK                 {:RESULT = new ArrayLookupExpr(array, index);:}
+                | expr:array DOT LENGTH                                 {:RESULT = new ArrayLengthExpr(array);:}
+                | expr:obj DOT id:method O_PAR paramList:pList C_PAR    {:RESULT = new MethodCallExpr(obj, method, pList);:}
+                | INTEGER:v                                             {:RESULT = new IntegerLiteralExpr(v);:}
+                | FALSE:v                                               {:RESULT = new BooleanLiteralExpr(v);:}
+                | TRUE:v                                                {:RESULT = new BooleanLiteralExpr(v);:}
+                | id:v                                                  {:RESULT = new IdentifierExpr(v);:}
+                | THIS                                                  {:RESULT = new ThisExpr();:}
+                | NEW INT O_BRACK expr:len C_BRACK                      {:RESULT = new NewArrayExpr(len);:}
+                | NEW id:type O_PAR C_PAR                               {:RESULT = new NewObjectExpr(type);:}
+                | O_PAR expr:expr C_PAR                                 {:RESULT = expr;:}
+                | expr:e INTEGER:i                                      {:if(i < 0) RESULT = new BinaryIntegerExpr(e, new IntegerLiteralExpr(-i), BinaryIntegerExpr.BinaryIntegerOperation.MINUS);
+                                                                                  else throw new UnsupportedOperationException();:}
+            ;
+
+paramList   ::= params:params                                           {:RESULT = params;:}
+                |                                                       {:RESULT = new ExpressionList();:}
+            ;
+
+params      ::= params:pList COMMA expr:param                           {:pList.add(param); RESULT = pList;:}
+                | expr:param                                            {:RESULT = new ExpressionList(); RESULT.add(param);:}
+            ;
